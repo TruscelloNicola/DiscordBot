@@ -1,0 +1,79 @@
+﻿@page "/badwordlist"
+@inject HttpClient Http
+@inject IHttpClientFactory ClientFactory
+
+<PageTitle>Bad word list</PageTitle>
+
+<h1>Bad word list</h1>
+
+<p>Declares which words are bad and sends it to the bot.</p>
+<p>Style to be written is in CSV. (Comma separated value)</p>
+<p>Changes will be applied upon bot restart.</p>
+<br />
+<h3>Input bad words:</h3>
+
+<div class="mb-3" style="max-width: 750px; max-height: 200px">
+    <input class="form-control" id="exampleFormControlInput1" placeholder="Badword1,Badword2...">
+</div>
+
+<button @onclick="@(e => SetBadWords(inputval))">Send off...</button>
+
+@if (errorExecution)
+{
+    <br />
+    <p>Error with execution!</p>
+}
+
+@if (!shouldRender)
+{
+    <br />
+    <br />
+    <div class="spinner-border" role="status">
+        <span class="sr-only"></span>
+    </div>
+}
+
+@code {
+    string inputval = "Badword1, badword2";
+    private bool shouldRender = true;
+    List<string> liststring = new List<string>();
+
+    private bool errorExecution = false;
+
+    public class BadWordsRequest
+    {
+        public List<string> BadWords { get; set; }
+    }
+
+    public async Task SetBadWords(string inputstring)
+    {
+        shouldRender = false;
+
+        liststring = inputstring.Split(",").ToList<string>();
+
+        var request = new BadWordsRequest { BadWords = liststring };
+
+        var jsonContent = JsonSerializer.Serialize(request);
+
+        string query = "http://localhost:5000/api/SetBadWords";
+
+        var client = ClientFactory.CreateClient();
+
+
+        StringContent content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+        var response = await client.PostAsync(query, content);
+
+        if (response.IsSuccessStatusCode)
+        {
+            errorExecution = false;
+        }
+        else
+        {
+            errorExecution = true;
+            var errorContent = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Request failed with status code {response.StatusCode}. Error content: {errorContent}");
+        }
+        shouldRender = true;
+    }
+}

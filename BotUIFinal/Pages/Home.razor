@@ -1,0 +1,137 @@
+﻿@page "/"
+@inject IHttpClientFactory ClientFactory
+@inject Microsoft.AspNetCore.Components.NavigationManager NavigationManager
+
+<PageTitle>DashboardBot</PageTitle>
+
+<h1>Dashboard Bot</h1>
+
+
+@if (getBranchesError)
+{
+	<h2>Unable to get results. Please try again later.</h2>
+}
+else
+{
+	@if (shouldRender == true)
+	{
+		<ul class="list-group">
+
+		@foreach(string a in dictContent.Keys)
+		{
+				<li class="list-group-item" style="max-width: 750px">
+					<strong>@a</strong>
+					<br />
+					<div>
+						<span>
+							<Button @onclick="@(e => TryKick(dictContent[a]))" class="btn btn-warning">Kick</Button>
+							<Button @onclick="@(e => TryBan(dictContent[a]))" class="btn btn-danger">Ban</Button>
+						</span>
+					</div>
+				</li>
+		}
+		</ul>
+	}
+	else
+	{
+		<div class="spinner-border" role="status">
+			<span class="sr-only"></span>
+		</div>
+	}
+}
+
+@code{
+	List<string> content = new List<string>();
+
+	Dictionary<string, string> dictContent = new Dictionary<string, string>();
+
+	private bool getBranchesError;
+	private bool shouldRender;
+	private bool errorWithAnyBans;
+
+	protected override async Task OnInitializedAsync()
+	{
+		var request = new HttpRequestMessage(HttpMethod.Get,"http://localhost:5000/api/guildMember");
+
+		var client = ClientFactory.CreateClient();
+
+		var response = await client.SendAsync(request);
+
+		if (response.IsSuccessStatusCode)
+		{
+			using var responseStream = await response.Content.ReadAsStreamAsync();
+			content = await JsonSerializer.DeserializeAsync<List<string>>(responseStream);
+
+			foreach (string c in content)
+			{
+				string[] temp = c.Split(",");
+				dictContent.Add(temp[1], temp[0]);
+			}
+		}
+		else
+		{
+			getBranchesError = true;
+			var errorContent = await response.Content.ReadAsStringAsync();
+			Console.WriteLine($"Guild fill request failed with status code {response.StatusCode}. Error content: {errorContent}");
+		}
+
+		shouldRender = true;
+	}
+
+	async Task TryBan(string input)
+	{
+		string query = "http://localhost:5000/api/BanSomeone?Id=";
+
+		query += input;
+
+		var request = new HttpRequestMessage(HttpMethod.Get, query);
+
+		var client = ClientFactory.CreateClient();
+
+		var response = await client.SendAsync(request);
+
+		if (!response.IsSuccessStatusCode)
+		{
+			errorWithAnyBans = true;
+		}
+		else
+		{
+			errorWithAnyBans = false;
+			var errorContent = await response.Content.ReadAsStringAsync();
+			Console.WriteLine($"Kick request failed with status code {response.StatusCode}. Error content: {errorContent}");
+		}
+		RefreshPage();
+
+	}
+
+
+	async Task TryKick(string input)
+	{
+		string query = "http://localhost:5000/api/KickSomeone?Id=";
+
+		query += input;
+
+		var request = new HttpRequestMessage(HttpMethod.Get, query);
+
+		var client = ClientFactory.CreateClient();
+
+		var response = await client.SendAsync(request);
+
+		if (!response.IsSuccessStatusCode)
+		{
+			errorWithAnyBans = true;
+		}
+		else
+		{
+			errorWithAnyBans = false;
+			var errorContent = await response.Content.ReadAsStringAsync();
+			Console.WriteLine($"Ban request failed with status code {response.StatusCode}. Error content: {errorContent}");
+		}
+		RefreshPage();
+	}
+
+	private void RefreshPage()
+	{
+		NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true);
+	}
+}
